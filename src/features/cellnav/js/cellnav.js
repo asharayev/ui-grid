@@ -1039,7 +1039,6 @@
           $elm.find('div').on('click', function (evt) {
             uiGridCtrl.cellNav.broadcastCellNav(new GridRowColumn($scope.row, $scope.col), evt.ctrlKey || evt.metaKey, evt);
 
-            evt.stopPropagation();
             $scope.$apply();
           });
 
