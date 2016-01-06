@@ -668,6 +668,22 @@
                 _scope.$broadcast(uiGridCellNavConstants.CELL_NAV_EVENT);
               };
 
+              uiGridCtrl.cellNav.suspendFocus = grid.cellNav.suspendFocus = function () {
+                  grid.cellNav.focusedCellsSuspended = grid.cellNav.focusedCells;
+                  grid.cellNav.focusedCells = [];
+                  _scope.$broadcast(uiGridCellNavConstants.CELL_NAV_EVENT);
+              };
+
+              uiGridCtrl.cellNav.restoreFocus = grid.cellNav.restoreFocus = function () {
+                  if (grid.cellNav.focusedCellsSuspended && grid.cellNav.lastRowCol) {
+
+                      grid.cellNav.focusedCells = grid.cellNav.focusedCellsSuspended;
+                      grid.cellNav.focusedCellsSuspended = null;
+
+                      _scope.$broadcast(uiGridCellNavConstants.CELL_NAV_EVENT);
+                  }
+              };
+
               uiGridCtrl.cellNav.broadcastFocus = function (rowCol, modifierDown, originEvt) {
                 modifierDown = !(modifierDown === undefined || !modifierDown);
 
@@ -678,10 +694,64 @@
 
                 var rowColSelectIndex = uiGridCtrl.grid.api.cellNav.rowColSelectIndex(rowCol);
 
-                if (grid.cellNav.lastRowCol === null || rowColSelectIndex === -1) {
+                if (originEvt && originEvt.shiftKey === true && grid.cellNav.lastRowCol != null) {
+                    var lastRowCol = grid.cellNav.lastRowCol;
+
+                    // try to select a range of cells starting from last cell to the new cell:
+                    if (lastRowCol.col.uid === col.uid &&
+                        lastRowCol.row.uid === row.uid) {
+
+                        if (rowColSelectIndex >= 0) {
+                            // same cell clicked, simply deselect it:
+                            grid.cellNav.focusedCells.splice(rowColSelectIndex, 1);
+                        }
+                    } else {
+                        // push to focusedCells all cells between lastRowCol and rowCol:
+                        var lastRowIndex = grid.rows.indexOf(lastRowCol.row);
+                        var lastColIndex = grid.columns.indexOf(lastRowCol.col);
+                        var rowIndex = grid.rows.indexOf(row);
+                        var colIndex = grid.columns.indexOf(col);
+
+                        if (lastRowIndex >= 0 && lastColIndex >= 0 && rowIndex >= 0 && colIndex >= 0) {
+                            console.log('trying to select cells from ', lastRowIndex, lastColIndex, grid.rows, grid.columns);
+
+                            var rDelta = rowIndex > lastRowIndex ? 1 : -1;
+                            var cDelta = colIndex > lastColIndex ? 1 : -1;
+
+                            var selecting = rowColSelectIndex === -1;
+
+                            for (var r = lastRowIndex; r != rowIndex + rDelta; r += rDelta) {
+                                var srow = grid.rows[r];
+                                if (srow.visible !== true) continue;
+
+                                for (var c = lastColIndex; c != colIndex + cDelta; c += cDelta) {
+                                    var scol = grid.columns[c];
+
+                                    var rc = new GridRowColumn(srow, scol);
+
+                                    if (selecting) {
+                                        if (uiGridCtrl.grid.api.cellNav.rowColSelectIndex(rc) < 0) {
+                                            grid.cellNav.focusedCells.push(rc);
+                                        }
+                                    } else {
+                                        var i = uiGridCtrl.grid.api.cellNav.rowColSelectIndex(rc);
+                                        if (i >= 0) {
+                                            grid.cellNav.focusedCells.splice(i, 1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    grid.api.cellNav.raise.navigate(rowCol, grid.cellNav.lastRowCol, originEvt);
+                    grid.cellNav.lastRowCol = rowCol;
+                }
+                else if (grid.cellNav.lastRowCol === null || rowColSelectIndex === -1
+                    || (rowColSelectIndex >= 0 && !modifierDown)) {
                   var newRowCol = new GridRowColumn(row, col);
 
-                  grid.api.cellNav.raise.navigate(newRowCol, grid.cellNav.lastRowCol);
+                  grid.api.cellNav.raise.navigate(newRowCol, grid.cellNav.lastRowCol, originEvt);
                   grid.cellNav.lastRowCol = newRowCol;
                   if (uiGridCtrl.grid.options.modifierKeysToMultiSelectCells && modifierDown) {
                     grid.cellNav.focusedCells.push(rowCol);
@@ -694,7 +764,7 @@
                   grid.cellNav.focusedCells.splice(rowColSelectIndex, 1);
                 }
               };
-
+              
               uiGridCtrl.cellNav.handleKeyDown = function (evt) {
                 var direction = uiGridCellNavService.getDirection(evt);
                 if (direction === null) {
@@ -745,7 +815,7 @@
 
                   // Scroll to the new cell, if it's not completely visible within the render container's viewport
                   grid.scrollToIfNecessary(rowCol.row, rowCol.col).then(function () {
-                    uiGridCtrl.cellNav.broadcastCellNav(rowCol);
+                	uiGridCtrl.cellNav.broadcastCellNav(rowCol, null, evt);
                   });
 
 
@@ -874,7 +944,7 @@
                 if (rowCol === null) {
                   rowCol = uiGridCtrl.grid.renderContainers[containerId].cellNav.getNextRowCol(uiGridCellNavConstants.direction.DOWN, null, null);
                   if (rowCol.row && rowCol.col) {
-                    uiGridCtrl.cellNav.broadcastCellNav(rowCol);
+                    uiGridCtrl.cellNav.broadcastCellNav(rowCol, null, evt);
                   }
                 }
               });
@@ -962,7 +1032,7 @@
 
                 // Skip if there's no currently-focused cell
                 var lastRowCol = uiGridCtrl.grid.api.cellNav.getFocusedCell();
-                if (lastRowCol === null) {
+                if (lastRowCol == null) {
                   return;
                 }
 
@@ -972,14 +1042,15 @@
                   return;
                 }
 
-                uiGridCtrl.cellNav.clearFocus();
-
+                if (renderContainerCtrl.rowContainer.renderedRows.length < renderContainerCtrl.rowContainer.visibleRowCache.length) {
+                  uiGridCtrl.cellNav.suspendFocus();
+                }
               });
 
               grid.api.core.on.scrollEnd($scope, function (args) {
                 // Skip if there's no currently-focused cell
                 var lastRowCol = uiGridCtrl.grid.api.cellNav.getFocusedCell();
-                if (lastRowCol === null) {
+                if (lastRowCol == null) {
                   return;
                 }
 
@@ -989,8 +1060,9 @@
                   return;
                 }
 
-                uiGridCtrl.cellNav.broadcastCellNav(lastRowCol);
-
+                if (renderContainerCtrl.rowContainer.renderedRows.length < renderContainerCtrl.rowContainer.visibleRowCache.length) {
+                  uiGridCtrl.cellNav.restoreFocus();
+                }
               });
 
               grid.api.cellNav.on.navigate($scope, function () {
