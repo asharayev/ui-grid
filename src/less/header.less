@@ -6,7 +6,7 @@
 @topPanelRadius: @gridBorderRadius - @gridBorderWidth;
 
 .ui-grid-header {
-  border-bottom: 1px solid @borderColor;
+  border-bottom: 1px solid @headerBackgroundColor;
   box-sizing: border-box;
 }
 
@@ -61,7 +61,7 @@
   box-sizing: border-box;
   background-color: inherit;
   border-right: @gridBorderWidth solid;
-  border-color: @headerVerticalBarColor;
+  border-color: @headerBackgroundColor;
   display: table-cell;
 
   &:last-child {
