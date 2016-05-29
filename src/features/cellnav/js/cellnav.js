@@ -720,11 +720,13 @@
 
                             var selecting = rowColSelectIndex === -1;
 
-                            for (var r = lastRowIndex; r != rowIndex + rDelta; r += rDelta) {
+                            for (var r = lastRowIndex; r !== rowIndex + rDelta; r += rDelta) {
                                 var srow = grid.rows[r];
-                                if (srow.visible !== true) continue;
+                                if (srow.visible !== true) {
+                                    continue;
+                                }
 
-                                for (var c = lastColIndex; c != colIndex + cDelta; c += cDelta) {
+                                for (var c = lastColIndex; c !== colIndex + cDelta; c += cDelta) {
                                     var scol = grid.columns[c];
 
                                     var rc = new GridRowColumn(srow, scol);
@@ -747,8 +749,7 @@
                     grid.api.cellNav.raise.navigate(rowCol, grid.cellNav.lastRowCol, originEvt);
                     grid.cellNav.lastRowCol = rowCol;
                 }
-                else if (grid.cellNav.lastRowCol === null || rowColSelectIndex === -1
-                    || (rowColSelectIndex >= 0 && !modifierDown)) {
+                else if (grid.cellNav.lastRowCol === null || rowColSelectIndex === -1 || (rowColSelectIndex >= 0 && !modifierDown)) {
                   var newRowCol = new GridRowColumn(row, col);
 
                   grid.api.cellNav.raise.navigate(newRowCol, grid.cellNav.lastRowCol, originEvt);
@@ -815,7 +816,7 @@
 
                   // Scroll to the new cell, if it's not completely visible within the render container's viewport
                   grid.scrollToIfNecessary(rowCol.row, rowCol.col).then(function () {
-                	uiGridCtrl.cellNav.broadcastCellNav(rowCol, null, evt);
+                    uiGridCtrl.cellNav.broadcastCellNav(rowCol, null, evt);
                   });
 
 
